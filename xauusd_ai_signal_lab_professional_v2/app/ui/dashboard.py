@@ -66,9 +66,8 @@ def init_state():
         "page":"Market", "mode":"SCALP", "refresh_sec":2,
         "min_score":MODE_RULES["SCALP"]["min_score"], "sl_atr":float(MODE_RULES["SCALP"]["sl_atr"]),
         "groq_key":settings.groq_key, "groq_model":settings.groq_model,
-        "email_enabled":False, "gmail_sender":settings.gmail_sender,
-        "gmail_recipient":settings.gmail_recipient, "gmail_app_password":settings.gmail_app_password,
-        "email_threshold":80, "email_cooldown":15, "chat_messages":[], "pending_question":"",
+        "email_enabled":False, "email_threshold":50, "email_cooldown":15,
+        "chat_messages":[], "pending_question":"",
     }
     for k,v in defaults.items():
         if k not in st.session_state: st.session_state[k]=v
@@ -145,7 +144,7 @@ if st.session_state.email_enabled and direction in {"BUY","SELL"} and analysis["
                 except Exception as ge: groq_text=f"Groq unavailable: {ge}"
             subject=f'XAUUSD {mode} {direction} — Strong Signal {analysis["score"]}/100'
             body=(f'XAUUSD STRONG SIGNAL\n\nMODE: {mode}\nDIRECTION: {direction}\nSCORE: {analysis["score"]}/100\nREGIME: {regime}\n\nMARKET\nBid: {q["bid"]:.4f}\nAsk: {q["ask"]:.4f}\nSpread: {q["spread"]:.4f}\nTick age: {q["quoteAgeSeconds"]:.1f}s\n\nTRADE PLAN\nEntry: {plan["entry"]:.4f}\nSL: {plan["sl"]:.4f}\nTP: {plan["tp"]:.4f}\nR:R: 1:{plan["rr"]:.1f}\n\nEVIDENCE\n'+'\n'.join(f'- {x}' for x in analysis["reasons"])+f'\n\nGROQ ANALYSIS\n--------------\n{groq_text}\n\nData path: BiQuote SignalR tick stream → local 1m candles.\nNo order was executed by this application.\n')
-            send_email(st.session_state.gmail_sender,st.session_state.gmail_app_password,st.session_state.gmail_recipient,subject,body); mark_sent("gmail",signal_key); st.toast("Strong-signal email sent.",icon="📧")
+            send_email(settings.gmail_sender,settings.gmail_app_password,settings.gmail_recipient,subject,body); mark_sent("gmail",signal_key); st.toast("Strong-signal email sent.",icon="📧")
     except Exception as exc: st.warning(f"Email alert failed: {exc}")
 
 if "last_journal_key" not in st.session_state: st.session_state.last_journal_key=None
@@ -279,7 +278,7 @@ else:
         st.session_state.refresh_sec=st.slider("Dashboard refresh",1,10,int(st.session_state.refresh_sec),key="settings_refresh")
         nm=st.selectbox("Trading mode",["SCALP","INTRADAY","SWING"],index=["SCALP","INTRADAY","SWING"].index(st.session_state.mode),key="settings_mode")
         if nm!=st.session_state.mode: st.session_state.mode=nm; st.session_state.min_score=MODE_RULES[nm]["min_score"]; st.session_state.sl_atr=float(MODE_RULES[nm]["sl_atr"])
-        st.session_state.min_score=st.slider("Minimum signal score",60,95,int(st.session_state.min_score),key="settings_score")
+        st.session_state.min_score=st.slider("Minimum signal score",50,95,int(st.session_state.min_score),key="settings_score")
         st.session_state.sl_atr=st.slider("SL = ATR ×",0.5,2.5,float(st.session_state.sl_atr),0.1,key="settings_atr")
         st.markdown(f'<div class="successline">Live feed: <b>{"CONNECTED" if stream_on else "RECONNECTING"}</b> · BiQuote SignalR → local 1m candle builder</div>',unsafe_allow_html=True)
     with b:
@@ -288,9 +287,12 @@ else:
         st.session_state.groq_model=st.selectbox("Groq model",["openai/gpt-oss-120b","openai/gpt-oss-20b"],index=0 if st.session_state.groq_model=="openai/gpt-oss-120b" else 1)
         st.markdown('<div class="cardtitle" style="margin-top:16px">GMAIL ALERTS</div>',unsafe_allow_html=True)
         st.session_state.email_enabled=st.checkbox("Automatic strong-signal emails",value=st.session_state.email_enabled)
-        st.session_state.gmail_sender=st.text_input("Sender Gmail",value=st.session_state.gmail_sender)
-        st.session_state.gmail_recipient=st.text_input("Recipient email",value=st.session_state.gmail_recipient)
-        st.session_state.gmail_app_password=st.text_input("Gmail App Password",value=st.session_state.gmail_app_password,type="password")
-        st.session_state.email_threshold=st.slider("Strong-signal threshold",70,95,int(st.session_state.email_threshold),key="settings_email_threshold")
+        st.caption("Credentials are configured in app/config/settings.py and are not shown in the dashboard.")
+        st.session_state.email_threshold=st.selectbox(
+            "Strong-signal threshold",
+            [45, 50, 60, 70, 80],
+            index=[45, 50, 60, 70, 80].index(int(st.session_state.email_threshold)),
+            key="settings_email_threshold",
+        )
         st.session_state.email_cooldown=st.slider("Email cooldown (minutes)",1,60,int(st.session_state.email_cooldown),key="settings_email_cooldown")
     st.markdown('<div class="alert">Automatic path: strong new signal → Python calculates Entry/SL/TP → Groq explains → Gmail sends. The AI Copilot is separate and optional. No order execution.</div>',unsafe_allow_html=True)

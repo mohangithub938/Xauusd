@@ -51,7 +51,10 @@ class XAUUSDTickStream:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        self._bars = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+        self._bars = pd.DataFrame(
+            columns=["open", "high", "low", "close", "volume"],
+            index=pd.DatetimeIndex([], name="openTime"),
+        )
         self._current: dict[str, Any] | None = None
         self._quote: dict[str, Any] | None = None
         self.status = StreamStatus()
@@ -254,7 +257,13 @@ class XAUUSDTickStream:
 
     def completed_candles(self) -> pd.DataFrame:
         with self._lock:
-            return self._bars.copy()
+            bars = self._bars.copy()
+            if bars.empty:
+                return bars
+            if not isinstance(bars.index, pd.DatetimeIndex):
+                bars.index = pd.to_datetime(bars.index, utc=True, errors="coerce")
+            bars = bars[~pd.isna(bars.index)].sort_index()
+            return bars
 
     def current_candle(self) -> dict[str, Any] | None:
         with self._lock:

@@ -1,7 +1,15 @@
 import pandas as pd
 
 def resample(df,rule):
-    return df.resample(rule).agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna()
+    work = df.copy()
+    if work.empty:
+        return work
+    if not isinstance(work.index, pd.DatetimeIndex):
+        work.index = pd.to_datetime(work.index, utc=True, errors="coerce")
+    work = work[~pd.isna(work.index)].sort_index()
+    if work.empty:
+        return work
+    return work.resample(rule).agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna()
 
 def run(df,signal_fn,mode,horizon=30):
     rows=[]
