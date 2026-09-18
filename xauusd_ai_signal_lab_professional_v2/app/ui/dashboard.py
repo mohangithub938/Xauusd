@@ -283,7 +283,7 @@ else:
         st.markdown(f'<div class="successline">Live feed: <b>{"CONNECTED" if stream_on else "RECONNECTING"}</b> · BiQuote SignalR → local 1m candle builder</div>',unsafe_allow_html=True)
     with b:
         st.markdown('<div class="cardtitle">GROQ AI</div>',unsafe_allow_html=True)
-        st.session_state.groq_key=st.text_input("Groq API key",value=st.session_state.groq_key,type="password")
+        st.caption("Groq key is configured in app/config/settings.py and is not shown in the dashboard.")
         st.session_state.groq_model=st.selectbox("Groq model",["openai/gpt-oss-120b","openai/gpt-oss-20b"],index=0 if st.session_state.groq_model=="openai/gpt-oss-120b" else 1)
         st.markdown('<div class="cardtitle" style="margin-top:16px">GMAIL ALERTS</div>',unsafe_allow_html=True)
         st.session_state.email_enabled=st.checkbox("Automatic strong-signal emails",value=st.session_state.email_enabled)
