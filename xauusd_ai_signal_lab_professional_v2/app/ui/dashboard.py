@@ -3,8 +3,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
+
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -129,7 +132,7 @@ analysis=score_setup(mode,context,setup,trigger)
 regime=detect_regime(trigger); row=trigger.iloc[-1]
 direction=analysis["direction"] if analysis["score"]>=st.session_state.min_score else "WAIT"
 plan=build_plan(mode,direction,q["bid"],q["ask"],analysis["atr"],st.session_state.sl_atr)
-signal_ts=trigger.index[-1].isoformat(); signal_key=f'{mode}|{signal_ts}|{direction}|{analysis["score"]}'
+signal_ts = trigger.index[-1].tz_localize("UTC").tz_convert(IST_TZ).isoformat() if trigger.index[-1].tzinfo is None else trigger.index[-1].tz_convert(IST_TZ).isoformat(); signal_key=f'{mode}|{signal_ts}|{direction}|{analysis["score"]}'
 
 # Auto Gmail alert with automatic Groq explanation
 if st.session_state.email_enabled and direction in {"BUY","SELL"} and analysis["score"]>=st.session_state.email_threshold:
@@ -166,7 +169,7 @@ def journal_items(df, limit=30):
         out.append({"timestamp":str(x.get("ts")),"mode":x.get("mode"),"direction":x.get("direction"),"score":x.get("score"),"entry":x.get("entry"),"sl":x.get("sl"),"tp":x.get("tp"),"rr":x.get("rr"),"regime":x.get("regime"),"status":x.get("status"),"reasons":x.get("reasons")})
     return out
 
-chat_context={"now_utc":datetime.now(timezone.utc).isoformat(),"current_quote":{"bid":q["bid"],"ask":q["ask"],"mid":q["mid"],"spread":q["spread"],"quote_age_seconds":q["quoteAgeSeconds"],"market_open":q.get("marketOpen")},"current_signal":{"mode":mode,"direction":direction,"score":analysis["score"],"minimum_score":st.session_state.min_score,"regime":regime,"timeframe_chain":tf_label,"reasons":analysis["reasons"],"entry":plan["entry"],"sl":plan["sl"],"tp":plan["tp"],"rr":plan["rr"],"rsi":float(row.rsi),"atr":float(row.atr),"adx":float(row.adx)},"stream":{"connected":stream_on,"tick_count":status.get("tick_count",0),"completed_candles":status.get("completed_candles",0),"reconnects":status.get("reconnects",0)},"recent_journal":journal_items(journal)}
+chat_context={"now_ist":datetime.now(IST_TZ).isoformat(),"current_quote":{"bid":q["bid"],"ask":q["ask"],"mid":q["mid"],"spread":q["spread"],"quote_age_seconds":q["quoteAgeSeconds"],"market_open":q.get("marketOpen")},"current_signal":{"mode":mode,"direction":direction,"score":analysis["score"],"minimum_score":st.session_state.min_score,"regime":regime,"timeframe_chain":tf_label,"reasons":analysis["reasons"],"entry":plan["entry"],"sl":plan["sl"],"tp":plan["tp"],"rr":plan["rr"],"rsi":float(row.rsi),"atr":float(row.atr),"adx":float(row.adx)},"stream":{"connected":stream_on,"tick_count":status.get("tick_count",0),"completed_candles":status.get("completed_candles",0),"reconnects":status.get("reconnects",0)},"recent_journal":journal_items(journal)}
 
 # ------------------------------
 # MARKET PAGE
@@ -206,7 +209,7 @@ elif st.session_state.page=="Signals":
     c=st.columns(4); c[0].metric("RECORDED",len(journal)); c[1].metric("BUY",int((journal.direction=="BUY").sum()) if not journal.empty else 0); c[2].metric("SELL",int((journal.direction=="SELL").sum()) if not journal.empty else 0); c[3].metric("CURRENT",direction,f'{analysis["score"]}/100')
     if journal.empty: st.info("No qualified BUY/SELL signals have been recorded yet.")
     else:
-        show=journal.copy(); show["ts"]=pd.to_datetime(show["ts"],utc=True,errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S UTC"); show=show[["ts","mode","direction","score","entry","sl","tp","rr","regime","status"]].rename(columns={"ts":"Timestamp","mode":"Mode","direction":"Direction","score":"Score","entry":"Entry","sl":"SL","tp":"TP","rr":"R:R","regime":"Regime","status":"Status"}); st.dataframe(show,use_container_width=True,hide_index=True)
+        show=journal.copy(); show["ts"]=pd.to_datetime(show["ts"],utc=True,errors="coerce").dt.tz_convert(IST_TZ).dt.strftime("%Y-%m-%d %H:%M:%S IST"); show=show[["ts","mode","direction","score","entry","sl","tp","rr","regime","status"]].rename(columns={"ts":"Timestamp","mode":"Mode","direction":"Direction","score":"Score","entry":"Entry","sl":"SL","tp":"TP","rr":"R:R","regime":"Regime","status":"Status"}); st.dataframe(show,use_container_width=True,hide_index=True)
         latest=journal.iloc[0]; st.markdown('<div class="section"><strong>Latest setup</strong><span>Most recently recorded qualified signal</span></div>',unsafe_allow_html=True)
         a,b=st.columns([1.0,2.2]); a.markdown(f'<div class="signal {sigclass(str(latest.direction))}"><div class="eyebrow">{latest.mode}</div><div class="signalword">{latest.direction}</div><div class="tiny">Score {int(latest.score)}/100 · {latest.regime}</div></div>',unsafe_allow_html=True); x=b.columns(4); x[0].metric("Entry",f'{float(latest.entry):.2f}'); x[1].metric("SL",f'{float(latest.sl):.2f}'); x[2].metric("TP",f'{float(latest.tp):.2f}'); x[3].metric("R:R",f'1:{float(latest.rr):.1f}'); st.markdown(f'<div class="tiny" style="margin-top:10px"><b>Evidence:</b> {latest.reasons}</div>',unsafe_allow_html=True)
 

@@ -7,8 +7,11 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 from app.data.biquote import BiQuote, FeedError, normalize_quote
 
@@ -152,11 +155,11 @@ class XAUUSDTickStream:
     def _tick_time(tick: dict[str, Any]) -> pd.Timestamp:
         raw = tick.get("timestamp") or tick.get("time") or tick.get("timestampUtc") or tick.get("serverTime")
         if raw is None:
-            return pd.Timestamp.now(tz="UTC")
+            return pd.Timestamp.now(tz=IST_TZ)
         ts = pd.to_datetime(raw, utc=True, errors="coerce")
         if pd.isna(ts):
-            return pd.Timestamp.now(tz="UTC")
-        return ts
+            return pd.Timestamp.now(tz=IST_TZ)
+        return ts.tz_convert(IST_TZ)
 
     def _handle_tick(self, tick: dict[str, Any]) -> None:
         try:
@@ -181,7 +184,7 @@ class XAUUSDTickStream:
                 "ask": ask,
                 "mid": mid,
                 "spread": float(tick.get("spread", ask - bid)),
-                "timestamp": tick.get("timestamp") or ts.isoformat(),
+                "timestamp": tick.get("timestamp") or ts.tz_convert(IST_TZ).isoformat(),
                 "quoteAgeSeconds": 0.0,
                 "stale": False,
             })
@@ -214,7 +217,8 @@ class XAUUSDTickStream:
                     "volume": 1,
                 }
 
-            self.status.current_candle_start = pd.Timestamp(self._current["start"]).isoformat()
+            ts_start = pd.Timestamp(self._current["start"])
+            self.status.current_candle_start = ts_start.tz_convert(IST_TZ).isoformat() if ts_start.tzinfo else ts_start.tz_localize(IST_TZ).isoformat()
 
     def _finalize_current(self) -> None:
         if not self._current:
