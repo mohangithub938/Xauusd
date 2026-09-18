@@ -175,7 +175,18 @@ chat_context={"now_ist":datetime.now(IST_TZ).isoformat(),"current_quote":{"bid":
 # ------------------------------
 if st.session_state.page=="Market":
     header("Market Command Center","Your primary trading view: live price, clean chart, engine state and a deterministic 1:2 scalp plan where applicable.")
-    c=st.columns(4); c[0].metric("LIVE PRICE",f'{q["mid"]:.2f}',f'Spread {q["spread"]:.2f}'); c[1].metric("SIGNAL",direction,f'{analysis["score"]}/100'); c[2].metric("REGIME",regime,mode); c[3].metric("STREAM","CONNECTED" if stream_on else "RECONNECTING",f'{status.get("tick_count",0):,} ticks')
+    regime_short = regime.upper()
+    if "BULL" in regime_short:
+        regime_short = "BULLISH"
+    elif "BEAR" in regime_short:
+        regime_short = "BEARISH"
+    elif "RANGE" in regime_short:
+        regime_short = "RANGE"
+    elif "NEUT" in regime_short:
+        regime_short = "NEUTRAL"
+    elif len(regime_short) > 12:
+        regime_short = regime_short[:12]
+    c=st.columns(4); c[0].metric("LIVE PRICE",f'{q["mid"]:.2f}',f'Spread {q["spread"]:.2f}'); c[1].metric("TREND",direction,f'{analysis["score"]}/100'); c[2].metric("REGIME",regime_short,mode); c[3].metric("STREAM","CONNECTED" if stream_on else "RECONNECTING",f'{status.get("tick_count",0):,} ticks')
     st.markdown(f'<div class="section"><strong>Price & structure</strong><span>{tf_label} · completed candles · live tick feed</span></div>',unsafe_allow_html=True)
     left,right=st.columns([2.25,1],gap="large")
     with left:
